@@ -23,6 +23,7 @@ wss.on('connection', (ws) => {
             const roomId = msg.room;
             if (!rooms[roomId]) {
                 rooms[roomId] = { host: null, guest: null };
+                console.log(`[Sala ${roomId}] Creada por un nuevo host.`);
             }
 
             if (!rooms[roomId].host) {
@@ -36,6 +37,7 @@ wss.on('connection', (ws) => {
                 rooms[roomId].guest = ws;
                 currentRoom = roomId;
                 currentId = 2;
+                console.log(`[Sala ${roomId}] Un jugador invitado se ha unido.`);
                 ws.send(JSON.stringify({ type: 'joined', id: 2, is_host: false }));
                 
                 // Notify host that guest connected
@@ -44,7 +46,16 @@ wss.on('connection', (ws) => {
                 // Room full
                 ws.send(JSON.stringify({ type: 'error', message: 'Room full' }));
             }
-        } 
+        }
+        else if (msg.type === 'list_rooms') {
+            const availableRooms = [];
+            for (const r in rooms) {
+                if (rooms[r].host && !rooms[r].guest) {
+                    availableRooms.push(r);
+                }
+            }
+            ws.send(JSON.stringify({ type: 'room_list', rooms: availableRooms }));
+        }
         else if (msg.type === 'message') {
             // Forward message to the other peer in the room
             if (currentRoom && rooms[currentRoom]) {
@@ -64,6 +75,7 @@ wss.on('connection', (ws) => {
 
     ws.on('close', () => {
         if (currentRoom && rooms[currentRoom]) {
+            console.log(`[Sala ${currentRoom}] El jugador ${currentId} se ha desconectado. Cerrando sala.`);
             // If one leaves, notify the other and delete room
             const otherWs = currentId === 1 ? rooms[currentRoom].guest : rooms[currentRoom].host;
             if (otherWs && otherWs.readyState === WebSocket.OPEN) {
