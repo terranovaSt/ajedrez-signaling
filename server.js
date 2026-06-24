@@ -40,8 +40,13 @@ wss.on('connection', (ws) => {
                 console.log(`[Sala ${roomId}] Un jugador invitado se ha unido.`);
                 ws.send(JSON.stringify({ type: 'joined', id: 2, is_host: false }));
                 
-                // Notify host that guest connected
-                rooms[roomId].host.send(JSON.stringify({ type: 'peer_connected', id: 2 }));
+                // Notify host that guest connected, with safety check
+                if (rooms[roomId].host && rooms[roomId].host.readyState === WebSocket.OPEN) {
+                    rooms[roomId].host.send(JSON.stringify({ type: 'peer_connected', id: 2 }));
+                } else {
+                    console.log(`[Sala ${roomId}] Error: Host no disponible al unirse el invitado.`);
+                    ws.send(JSON.stringify({ type: 'error', message: 'Host disconnected' }));
+                }
             } else {
                 // Room full
                 ws.send(JSON.stringify({ type: 'error', message: 'Room full' }));
@@ -85,3 +90,12 @@ wss.on('connection', (ws) => {
         }
     });
 });
+
+// Keepalive: enviar un ping cada 20 segundos a todos los clientes conectados para evitar que Render desconecte por inactividad
+setInterval(() => {
+    wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'ping' }));
+        }
+    });
+}, 20000);
